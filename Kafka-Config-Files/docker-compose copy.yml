@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000  # Optional, adjust as needed
+      ZOOKEEPER_INIT_LIMIT: 10    # Optional, adjust as needed
+      ZOOKEEPER_SYNC_LIMIT: 5      # Optional, adjust as needed
+
+  kafka:
+    build: ./kafka  # Adjust if you have a Dockerfile for Kafka, otherwise use the image
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_REWIND_LOG_ENABLED: true
+      KAFKA_LOG_RETENTION_HOURS: 168
+
+  mysql:
+    build: ./mysql  # Adjust if you have a Dockerfile for MySQL, otherwise use the image
+    ports:
+      - "3307:3306"  # You might want to change this to "3307:3306" if you have another service using 3306
+    environment:
+      MYSQL_ROOT_PASSWORD: Uejaa@31
+      MYSQL_DATABASE: logistics
+
+  logistics:
+    build: ./services/logistics-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka
+      - mysql
+
+  standard:
+    build: ./services/standard-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - kafka
+      - mysql
+
+  express:
+    build: ./services/express-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - kafka
+      - mysql
+
+  international:
+    build: ./services/international-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      - kafka
+      - mysql
