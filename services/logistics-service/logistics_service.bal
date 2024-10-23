@@ -85,19 +85,38 @@ service /logistics on new http:Listener(8080) {
 
     // Endpoint to retrieve all customers
     resource function get customers() returns Customer[]|error {
-        stream<Customer, sql:Error?> customerStream = self.db->query(SELECT * FROM customers);
-        return from Customer customer in customerStream select customer;
-    }
+    // Define the SQL query correctly with backticks
+    stream<Customer, sql:Error?> customerStream = self.db->query(`SELECT * FROM customers`);
+
+    Customer[] customerList = [];
+
+    // Iterate over the stream and collect customers
+    check from Customer customer in customerStream
+        do {
+            customerList.push(customer);
+        };
+
+    return customerList;
+}
 
     // Endpoint to retrieve a single customer by ID
-    resource function get customers/[int id]() returns Customer|http:NotFound|error {
-        Customer|sql:Error result = self.db->queryRow(SELECT * FROM customers WHERE id = ${id});
-        if result is sql:NoRowsError {
-            return http:NOT_FOUND;
-        } else {
-            return result;
-        }
+resource function get customers/[int id]() returns Customer|http:NotFound|error {
+    // Define the SQL query with a placeholder for id
+    sql:ParameterizedQuery sqlQuery = `SELECT * FROM customers WHERE id = ${id}`;
+
+    // Execute the query and retrieve the result as a single Customer record
+    Customer|sql:Error result = self.db->queryRow(sqlQuery, Customer);
+
+    // Handle the case where no rows are found
+    if result is sql:NoRowsError {
+        return http:NOT_FOUND;
+    } else if result is error {
+        return result;
+    } else {
+        return result;
     }
+}
+
 
     // Endpoint to add a new customer
     resource function post customer(@http:Payload Customer customer) returns Customer|error {
@@ -109,17 +128,38 @@ service /logistics on new http:Listener(8080) {
 
     // Endpoint to retrieve all shipments
     resource function get shipments() returns Shipment[]|error {
-        stream<Shipment, sql:Error?> shipmentStream = self.db->query(SELECT * FROM shipments);
-        return from Shipment shipment in shipmentStream select shipment;
+        // Define the SQL query as a parameterized query
+        sql:ParameterizedQuery sqlQuery = `SELECT * FROM shipments`;
+        
+        // Correctly call the query() method with the parameterized query and Shipment type
+        stream<Shipment, sql:Error?> shipmentStream = self.db->query(sqlQuery, Shipment);
+
+        // Collect results from the stream into an array
+        Shipment[] shipmentList = [];
+        check shipmentStream.forEach(function(Shipment shipment) {
+            shipmentList.push(shipment);
+        });
+
+        return shipmentList; // Return the list of shipments
     }
+
+
 
     // Endpoint to retrieve a single shipment by ID
     resource function get shipments/[int id]() returns Shipment|http:NotFound|error {
-        Shipment|sql:Error result = self.db->queryRow(SELECT * FROM shipments WHERE id = ${id});
+        // Define the SQL query as a parameterized query
+        sql:ParameterizedQuery sqlQuery = `SELECT * FROM shipments WHERE id = ${id}`;
+        
+        // Execute the queryRow with correct parameters
+        Shipment|sql:Error result = self.db->queryRow(sqlQuery, Shipment);
+        
+        // Check for NoRowsError
         if result is sql:NoRowsError {
-            return http:NOT_FOUND;
+            return http:NOT_FOUND; // Return Not Found response
+        } else if result is Shipment {
+            return result; // Return the found shipment
         } else {
-            return result;
+            return result; // Return any other potential errors
         }
     }
 
